@@ -1,0 +1,70 @@
+version: "3.8"
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.3
+    environment:
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - govsc-net
+
+  redis:
+    image: redis:6.2
+    ports:
+      - "6379:6379"
+    networks:
+      - govsc-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.15.0
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    networks:
+      - govsc-net
+
+  minio:
+    image: minio/minio
+    environment:
+      - MINIO_ACCESS_KEY=testminioadmin
+      - MINIO_SECRET_KEY=testminioadmin
+      - MINIO_BUCKET_NAME=govsc-${REPO_NAME}  # Dynamic bucket per repository
+      - MINIO_VERSIONING=true
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./minio/data:/data  # Bind data to local volume
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - govsc-net
+
+  govsc:
+    build: .
+    environment:
+      - GOVCS_ETCD_ENDPOINTS=etcd:2379
+      - GOVCS_REDIS_ADDR=redis:6379
+      - GOVCS_S3_BUCKET=minio
+      - GOVCS_ELASTICSEARCH_URL=http://elasticsearch:9200
+      - GOVCS_GITHUB_TOKEN=${GOVCS_GITHUB_TOKEN}
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - S3_ENDPOINT=http://minio:9000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - etcd
+      - redis
+      - elasticsearch
+      - minio
+    networks:
+      - govsc-net
+
+networks:
+  govsc-net:
+    driver: bridge

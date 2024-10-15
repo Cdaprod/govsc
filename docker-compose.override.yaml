@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  govsc:
+    environment:
+      - GOVSC_ENV=test    # Indicate we're in test mode
+      - GOVSC_LOG_LEVEL=debug  # Enable verbose logging for debugging during build tests
+      - GOVSC_BUILD_TEST=true  # Custom flag to indicate we're running build tests
+    volumes:
+      - ./test-reports:/app/test-reports    # Mount a directory for test reports
+      - ./build-artifacts:/app/build-artifacts  # Mount a directory for build artifacts
+    command: ["sh", "-c", "go test -v ./... > /app/test-reports/test-output.log && go build -o /app/build-artifacts/govsc"]  # Run tests and build
+    ports:
+      - "8081:8080"   # Change the exposed port for testing to avoid conflicts with other environments
+
+  redis:
+    environment:
+      - REDIS_LOGLEVEL=verbose   # Enable verbose logging for Redis during test builds
+
+  elasticsearch:
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS="-Xms512m -Xmx512m"
+      - logger.org.elasticsearch=debug  # Enable debug logging for Elasticsearch
+    ports:
+      - "9201:9200"   # Change the exposed port for testing
+
+  minio:
+    environment:
+      - MINIO_ACCESS_KEY=testminioadmin    # Use different credentials for the test environment
+      - MINIO_SECRET_KEY=testminioadmin
+    command: server /data --console-address ":9002"
+    ports:
+      - "9002:9001"   # Change the MinIO port for testing
+
+  etcd:
+    environment:
+      - ETCD_DEBUG=true  # Enable debug logging for Etcd during tests
+    ports:
+      - "2378:2379"  # Change Etcd port for test environment
+
+networks:
+  govsc-net:
+    driver: bridge
